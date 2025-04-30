@@ -195,10 +195,6 @@ async function fetchFeatureDescription(feature_id: string) {
 }
 
 async function sendMessageToBluesky(agent: AtpAgent, message: string) {
-  if (DEBUG) {
-    console.log("Sending message to Bluesky...");
-    console.log(message);
-  } else {
     const rt = new RichText({ text: message });
     await rt.detectFacets(agent);
     const postRecord: AptRecord = {
