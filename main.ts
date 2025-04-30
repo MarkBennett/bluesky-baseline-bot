@@ -52,76 +52,76 @@ async function getBaselineData(baselineStatus: BaselineStatus) {
     : baselineStatus;
 
   // Get the ending timestamp (now):
-  const END_TIMESTAMP = new Date().getTime();
+  const endTimestamp = new Date().getTime();
 
   // Determine whether to calculate for Newly or Widely available status:
-  let START_TIMESTAMP = END_TIMESTAMP;
+  let startTimestamp = endTimestamp;
 
   if (baselineStatus === "newly") {
-    START_TIMESTAMP -= 60 * 60 * 24 * 7 * 1000;
+    startTimestamp -= 60 * 60 * 24 * 7 * 1000;
   } else if (baselineStatus === "widely") {
-    START_TIMESTAMP -= 60 * 60 * 24 * 365.25 * 2.5 * 1000;
+    startTimestamp -= 60 * 60 * 24 * 365.25 * 2.5 * 1000;
   }
 
   // Build the start date:
-  const START_DATE_OBJ = new Date(START_TIMESTAMP);
-  const START_MONTH = new String(START_DATE_OBJ.getMonth() + 1).padStart(
+  const startDateObj = new Date(startTimestamp);
+  const startMonth = new String(startDateObj.getMonth() + 1).padStart(
     2,
     "0",
   );
-  const START_DATE = new String(START_DATE_OBJ.getDate()).padStart(2, "0");
-  const START_YEAR = new String(START_DATE_OBJ.getFullYear());
-  let AVAILABLE_START;
+  const startDate = new String(startDateObj.getDate()).padStart(2, "0");
+  const startYear = new String(startDateObj.getFullYear());
+  let availableStart;
 
   // If we're in debug mode, we want to ensure we get output, so set a date
   // in the far past to make sure something gets sent. This is because
   // sometimes there's no Newly available features in the last week
   if (DEBUG) {
-    AVAILABLE_START = "2020-01-01";
+    availableStart = "2020-01-01";
   } else {
-    AVAILABLE_START = `${START_YEAR}-${START_MONTH}-${START_DATE}`;
+    availableStart = `${startYear}-${startMonth}-${startDate}`;
   }
 
   // Build the end date:
-  const END_DATE_OBJ = new Date(END_TIMESTAMP);
-  const END_MONTH = new String(END_DATE_OBJ.getMonth() + 1).padStart(2, "0");
-  const END_DATE = new String(END_DATE_OBJ.getDate()).padStart(2, "0");
-  const END_YEAR = new String(END_DATE_OBJ.getFullYear());
-  let AVAILABLE_END;
+  const endDateObj = new Date(endTimestamp);
+  const endMonth = new String(endDateObj.getMonth() + 1).padStart(2, "0");
+  const endDate = new String(endDateObj.getDate()).padStart(2, "0");
+  const endYear = new String(endDateObj.getFullYear());
+  let availableEnd;
 
   if (DEBUG) {
-    AVAILABLE_END = "2025-01-01";
+    availableEnd = "2025-01-01";
   } else {
-    AVAILABLE_END = `${END_YEAR}-${END_MONTH}-${END_DATE}`;
+    availableEnd = `${endYear}-${endMonth}-${endDate}`;
   }
 
-  const QUERY_PARAMS = encodeURI(
+  const queryParams = encodeURI(
     [
-      `baseline_date:${AVAILABLE_START}..${AVAILABLE_END}`,
+      `baseline_date:${availableStart}..${availableEnd}`,
       `baseline_status:${baselineStatus}`,
     ].join(" AND "),
   );
 
   // Construct the fetch URL:
-  const FETCH_URL = `https://api.webstatus.dev/v1/features?q=${QUERY_PARAMS}`;
+  const fetchUrl = `https://api.webstatus.dev/v1/features?q=${queryParams}`;
 
   // If in debug mode, output the fetch URL to the console:
   if (DEBUG) {
-    console.log(FETCH_URL);
+    console.log(fetchUrl);
   }
 
   // Fetch the data and get its JSON representation:
-  const RESPONSE = await fetch(FETCH_URL);
-  const JSON_DATA = await RESPONSE.json();
+  const response = await fetch(fetchUrl);
+  const jsonData = await response.json();
 
   if (DEBUG) {
-    console.log(JSON_DATA);
+    console.log(jsonData);
   }
 
-  return JSON_DATA;
+  return jsonData;
 }
 
 // Learn more at https://docs.deno.com/runtime/manual/examples/module_metadata#concepts
 if (import.meta.main) {
-  const baseline = await getBaselineData("newly");
+  await getBaselineData("newly");
 }
