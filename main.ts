@@ -26,9 +26,19 @@ interface Feature {
   feature_id: string;
   name: string;
   spec: {
-    links: any[];
+    links: {
+      link: string;
+    }[];
   };
   usage: Record<BrowserKey, { daily: number }>;
+}
+
+interface FeatureResponse {
+  data: Feature[];
+  meta: {
+    next_page_token: string;
+    total: number;
+  };
 }
 
 /**
@@ -45,7 +55,9 @@ interface Feature {
  * @param baselineStatus indicates whether to get "newly" or "widely" available features
  * @returns the available features in the last 24 hours
  */
-async function getBaselineData(baselineStatus: BaselineStatus) {
+async function getBaselineData(
+  baselineStatus: BaselineStatus,
+): Promise<FeatureResponse> {
   // Default to "newly" available features if the status string is incorrect:
   baselineStatus = baselineStatus !== "newly" && baselineStatus !== "widely"
     ? "newly"
