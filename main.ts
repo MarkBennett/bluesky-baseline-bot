@@ -1,4 +1,4 @@
-const DEBUG = true;
+const DEBUG = Deno.env.get("DEBUG") === "true" ? true : false;
 
 type BASELINE_STATUS_TYPES = "newly" | "widely";
 
@@ -82,5 +82,4 @@ async function getBaselineData(baselineStatus: BASELINE_STATUS_TYPES) {
 // Learn more at https://docs.deno.com/runtime/manual/examples/module_metadata#concepts
 if (import.meta.main) {
   const baseline = await getBaselineData("newly");
-  console.log(baseline);
 }
