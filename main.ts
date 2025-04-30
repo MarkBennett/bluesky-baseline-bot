@@ -195,20 +195,19 @@ async function fetchFeatureDescription(feature_id: string) {
 }
 
 async function sendMessageToBluesky(agent: AtpAgent, message: string) {
-    const rt = new RichText({ text: message });
-    await rt.detectFacets(agent);
-    const postRecord: AptRecord = {
-      $type: "app.bsky.feed.post",
-      text: rt.text,
-      facets: rt.facets,
-      createdAt: new Date().toISOString(),
-    };
-    const record = await agent.post(postRecord);
+  const rt = new RichText({ text: message });
+  await rt.detectFacets(agent);
+  const postRecord: AptRecord = {
+    $type: "app.bsky.feed.post",
+    text: rt.text,
+    facets: rt.facets,
+    createdAt: new Date().toISOString(),
+  };
+  const record = await agent.post(postRecord);
 
-    if (DEBUG) {
-      console.log("Message sent to Bluesky successfully!");
-      console.log(record);
-    }
+  if (DEBUG) {
+    console.log("Message sent to Bluesky successfully!");
+    console.log(record);
   }
 }
 
