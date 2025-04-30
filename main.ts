@@ -6,6 +6,10 @@ const BLUESKY_HOST = Deno.env.get("BLUESKY_HOST") || "https://bsky.social";
 const BLUESKY_USERNAME = Deno.env.get("BLUESKY_USERNAME");
 const BLUESKY_PASSWORD = Deno.env.get("BLUESKY_PASSWORD");
 
+const PREAMBLE_LIMITED = "🟠 Limited Availability";
+const PREAMBLE_NEWLY = "🔵 Newly Available";
+const PREAMBLE_WIDELY = "🟢 Widely Available";
+
 type BaselineStatus = "newly" | "widely";
 type BrowserKey =
   | "chrome"
@@ -173,13 +177,17 @@ async function publishFeatureToBluesky(feature: Feature) {
 
   const description = await fetchFeatureDescription(feature_id);
 
-  // Construct the message to be sent to Bluesky:
-  const message = `Newly available feature: ${name}\n\n` +
-    `Description: ${description}\n\n` +
-    `Learn More: ${webStatusUrl}`;
+  // Construct the message to be sent to Bluesky
+  const messagePreamble = feature.baseline.status === "newly"
+    ? PREAMBLE_NEWLY
+    : feature.baseline.status === "widely"
+    ? PREAMBLE_WIDELY
+    : PREAMBLE_LIMITED;
+  const message = `${messagePreamble}: ${name}\n\n` +
+    `Description: ${description}\n\n`;
 
   const embedTitle = `Web Platform Status: ${name}`;
-  const embedDescription = `Newly available feature: ${description}`;
+  const embedDescription = `${messagePreamble}: ${description}`;
 
   // Get the Bluesky agent
   const agent = await getBlueskyAgent();
