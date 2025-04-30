@@ -162,7 +162,7 @@ async function publishFeatureToBluesky(feature: Feature) {
     `Learn More: ${webStatusUrl}`;
 
   // Send the message to Bluesky:
-  console.log(message);
+  await sendMessageToBluesky(message);
 }
 
 async function fetchFeatureDescription(feature_id: string) {
@@ -172,4 +172,11 @@ async function fetchFeatureDescription(feature_id: string) {
   const { description } = await descriptionRequest.json();
 
   return description;
+}
+
+function sendMessageToBluesky(message: string) {
+  if (DEBUG) {
+    console.log("Sending message to Bluesky...");
+    console.log(message);
+  }
 }
