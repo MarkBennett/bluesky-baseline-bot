@@ -216,7 +216,7 @@ async function getBlueskyAgent(): Promise<AtpAgent> {
   return agent;
 }
 
-async function retrieveAndPostNewlyAvailableFeatures() {
+export async function retrieveAndPostNewlyAvailableFeatures() {
   const { data: features } = await getBaselineData();
 
   if (features.length > 0) {
@@ -232,14 +232,6 @@ async function retrieveAndPostNewlyAvailableFeatures() {
     await publishNewlyAvailableFeaturesToBluesky(features);
   }
 }
-
-Deno.cron(
-  "Query for new Web Platform features and post to Bluesky",
-  "0 0 * * *",
-  async () => {
-    await retrieveAndPostNewlyAvailableFeatures();
-  },
-);
 
 // Learn more at https://docs.deno.com/runtime/manual/examples/module_metadata#concepts
 if (import.meta.main) {
