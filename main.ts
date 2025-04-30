@@ -1,4 +1,9 @@
+import { BskyAgent, RichText } from "npm:@atproto/api";
+
 const DEBUG = Deno.env.get("DEBUG") === "true" ? true : false;
+const BLUESKY_HOST = Deno.env.get("BLUESKY_HOST") || "https://bsky.social";
+const BLUESKY_USERNAME = Deno.env.get("BLUESKY_USERNAME");
+const BLUESKY_PASSWORD = Deno.env.get("BLUESKY_PASSWORD");
 
 type BaselineStatus = "newly" | "widely";
 type BrowserKey =
@@ -140,7 +145,18 @@ async function getBaselineData(
 if (import.meta.main) {
   const { data: features } = await getBaselineData("newly");
 
-  await publishNewlyAvailableFeaturesToBluesky(features);
+  if (features.length > 0) {
+    console.log("Newly available features!");
+  } else {
+    console.log("No newly available features!");
+    Deno.exit(0);
+  }
+
+  if (DEBUG) {
+    await publishFeatureToBluesky(features[0]);
+  } else {
+    await publishNewlyAvailableFeaturesToBluesky(features);
+  }
 }
 
 async function publishNewlyAvailableFeaturesToBluesky(features: Feature[]) {
@@ -161,8 +177,11 @@ async function publishFeatureToBluesky(feature: Feature) {
     `Description: ${description}\n\n` +
     `Learn More: ${webStatusUrl}`;
 
+  // Get the Bluesky agent
+  const agent = await getBlueskyAgent();
+
   // Send the message to Bluesky:
-  await sendMessageToBluesky(message);
+  await sendMessageToBluesky(agent, message);
 }
 
 async function fetchFeatureDescription(feature_id: string) {
@@ -174,9 +193,43 @@ async function fetchFeatureDescription(feature_id: string) {
   return description;
 }
 
-function sendMessageToBluesky(message: string) {
+async function sendMessageToBluesky(agent: BskyAgent, message: string) {
   if (DEBUG) {
     console.log("Sending message to Bluesky...");
     console.log(message);
+  } else {
+    const rt = new RichText({ text: message });
+    await rt.detectFacets(agent);
+    const postRecord = {
+      $type: "app.bsky.feed.post",
+      text: rt.text,
+      facets: rt.facets,
+      createdAt: new Date().toISOString(),
+    };
+    const record = await agent.post(postRecord);
+
+    if (DEBUG) {
+      console.log("Message sent to Bluesky successfully!");
+      console.log(record);
+    }
   }
+}
+
+async function getBlueskyAgent() {
+  if (!BLUESKY_USERNAME || !BLUESKY_PASSWORD || !BLUESKY_HOST) {
+    throw new Error("Missing Bluesky credentials");
+  }
+
+  const agent = new BskyAgent({
+    service: BLUESKY_HOST,
+  });
+  const sessionResponse = await agent.login({
+    identifier: BLUESKY_USERNAME,
+    password: BLUESKY_PASSWORD,
+  });
+  if (!sessionResponse.success) {
+    throw new Error(`Failed to login to Bluesky!`, { cause: sessionResponse });
+  }
+
+  return agent;
 }
