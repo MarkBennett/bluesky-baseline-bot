@@ -154,10 +154,7 @@ async function publishFeatureToBluesky(feature: Feature) {
 
   const webStatusUrl = `https://webstatus.dev/features/${feature_id}`;
 
-  const descriptionRequest = await fetch(
-    `https://api.webstatus.dev/v1/features/${feature_id}/feature-metadata`,
-  );
-  const { description } = await descriptionRequest.json();
+  const description = await fetchFeatureDescription(feature_id);
 
   // Construct the message to be sent to Bluesky:
   const message = `Newly available feature: ${name}\n\n` +
@@ -166,4 +163,13 @@ async function publishFeatureToBluesky(feature: Feature) {
 
   // Send the message to Bluesky:
   console.log(message);
+}
+
+async function fetchFeatureDescription(feature_id: string) {
+  const descriptionRequest = await fetch(
+    `https://api.webstatus.dev/v1/features/${feature_id}/feature-metadata`,
+  );
+  const { description } = await descriptionRequest.json();
+
+  return description;
 }
