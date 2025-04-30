@@ -42,7 +42,10 @@ interface FeatureResponse {
 }
 
 /**
- * Extract the baseline data from the WebStatus API. This retrieves the features going back by POLLING_INTERVAL_MS.
+ * Extract the baseline data from the WebStatus API.
+ *
+ * By default, this retrieves the "newly" available features in the last week. In debug mode, it retrieves going back to
+ * "2020-01-01".
  *
  * This is shamelessly copied from:
  *
