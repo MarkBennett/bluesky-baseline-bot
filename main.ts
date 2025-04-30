@@ -178,11 +178,20 @@ async function publishFeatureToBluesky(feature: Feature) {
     `Description: ${description}\n\n` +
     `Learn More: ${webStatusUrl}`;
 
+  const embedTitle = `Web Platform Status: ${name}`;
+  const embedDescription = `Newly available feature: ${description}`;
+
   // Get the Bluesky agent
   const agent = await getBlueskyAgent();
 
   // Send the message to Bluesky:
-  await sendMessageToBluesky(agent, message);
+  await sendMessageToBluesky(
+    agent,
+    message,
+    embedTitle,
+    embedDescription,
+    webStatusUrl,
+  );
 }
 
 async function fetchFeatureDescription(feature_id: string) {
@@ -194,7 +203,13 @@ async function fetchFeatureDescription(feature_id: string) {
   return description;
 }
 
-async function sendMessageToBluesky(agent: AtpAgent, message: string) {
+async function sendMessageToBluesky(
+  agent: AtpAgent,
+  message: string,
+  embedItitle: string,
+  embedDescription: string,
+  embedUrl: string,
+) {
   const rt = new RichText({ text: message });
   await rt.detectFacets(agent);
   const postRecord: AptRecord = {
@@ -202,6 +217,14 @@ async function sendMessageToBluesky(agent: AtpAgent, message: string) {
     text: rt.text,
     facets: rt.facets,
     createdAt: new Date().toISOString(),
+    embed: {
+      $type: "app.bsky.embed.external",
+      external: {
+        uri: embedUrl,
+        title: embedItitle,
+        description: embedDescription,
+      },
+    },
   };
   const record = await agent.post(postRecord);
 
