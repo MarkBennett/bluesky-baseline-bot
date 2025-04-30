@@ -2,6 +2,20 @@ const DEBUG = Deno.env.get("DEBUG") === "true" ? true : false;
 
 type BASELINE_STATUS_TYPES = "newly" | "widely";
 
+/**
+ * Extract the baseline data from the WebStatus API.
+ *
+ * This is shamelessly copied from:
+ *
+ * https://github.com/GoogleChromeLabs/baseline-demos/blob/main/tooling/email-digest/index.js
+ *
+ * See the Web Platform Baseline page to understand the difference between the baseline statuses:
+ *
+ * https://web-platform-dx.github.io/web-features/#how-do-features-become-part-of-baseline%3F
+ *
+ * @param baselineStatus indicates whether to get "newly" or "widely" available features
+ * @returns the available features in the last 24 hours
+ */
 async function getBaselineData(baselineStatus: BASELINE_STATUS_TYPES) {
   // Default to "newly" available features if the status string is incorrect:
   baselineStatus =
