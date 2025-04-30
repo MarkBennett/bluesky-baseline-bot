@@ -1,4 +1,5 @@
-import { BskyAgent, RichText } from "npm:@atproto/api";
+import { AtpAgent, RichText } from "npm:@atproto/api";
+import { type Record as AptRecord } from "npm:@atproto/api/dist/client/types/app/bsky/feed/post.js";
 
 const DEBUG = Deno.env.get("DEBUG") === "true" ? true : false;
 const BLUESKY_HOST = Deno.env.get("BLUESKY_HOST") || "https://bsky.social";
@@ -193,14 +194,14 @@ async function fetchFeatureDescription(feature_id: string) {
   return description;
 }
 
-async function sendMessageToBluesky(agent: BskyAgent, message: string) {
+async function sendMessageToBluesky(agent: AtpAgent, message: string) {
   if (DEBUG) {
     console.log("Sending message to Bluesky...");
     console.log(message);
   } else {
     const rt = new RichText({ text: message });
     await rt.detectFacets(agent);
-    const postRecord = {
+    const postRecord: AptRecord = {
       $type: "app.bsky.feed.post",
       text: rt.text,
       facets: rt.facets,
@@ -215,12 +216,12 @@ async function sendMessageToBluesky(agent: BskyAgent, message: string) {
   }
 }
 
-async function getBlueskyAgent() {
+async function getBlueskyAgent(): Promise<AtpAgent> {
   if (!BLUESKY_USERNAME || !BLUESKY_PASSWORD || !BLUESKY_HOST) {
     throw new Error("Missing Bluesky credentials");
   }
 
-  const agent = new BskyAgent({
+  const agent = new AtpAgent({
     service: BLUESKY_HOST,
   });
   const sessionResponse = await agent.login({
