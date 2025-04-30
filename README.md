@@ -1,4 +1,4 @@
-**THIS IS A WORK IN PROGRESS. PULL REQUESTS ARE WELCOME!**
+🚧 **THIS IS A WORK IN PROGRESS. PULL REQUESTS ARE WELCOME!** 🚧
 
 # Bluesky Baseline Bot
 
@@ -56,6 +56,12 @@ Run the tests using Deno's built-in test runner:
 ```bash
 deno test
 ```
+
+## TODO
+
+- [x] Retrieve baseline data from the WebStatus API for the last 24 hours
+- [x] Add support for posting to Bluesky
+- [ ] Tests
 
 ## File Structure
 
