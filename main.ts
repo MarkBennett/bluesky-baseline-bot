@@ -135,5 +135,32 @@ async function getBaselineData(
 
 // Learn more at https://docs.deno.com/runtime/manual/examples/module_metadata#concepts
 if (import.meta.main) {
-  await getBaselineData("newly");
+  const { data: features } = await getBaselineData("newly");
+
+  await publishNewlyAvailableFeaturesToBluesky(features);
+}
+
+async function publishNewlyAvailableFeaturesToBluesky(features: Feature[]) {
+  for (const feature of features) {
+    await publishFeatureToBluesky(feature);
+  }
+}
+
+async function publishFeatureToBluesky(feature: Feature) {
+  const { name, feature_id } = feature;
+
+  const webStatusUrl = `https://webstatus.dev/features/${feature_id}`;
+
+  const descriptionRequest = await fetch(
+    `https://api.webstatus.dev/v1/features/${feature_id}/feature-metadata`,
+  );
+  const { description } = await descriptionRequest.json();
+
+  // Construct the message to be sent to Bluesky:
+  const message = `Newly available feature: ${name}\n\n` +
+    `Description: ${description}\n\n` +
+    `Learn More: ${webStatusUrl}`;
+
+  // Send the message to Bluesky:
+  console.log(message);
 }
