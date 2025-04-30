@@ -1,9 +1,38 @@
 const DEBUG = Deno.env.get("DEBUG") === "true" ? true : false;
 
-type BASELINE_STATUS_TYPES = "newly" | "widely";
+type BaselineStatus = "newly" | "widely";
+type BrowserKey =
+  | "chrome"
+  | "chrome_android"
+  | "edge"
+  | "firefox"
+  | "firefox_android"
+  | "safari"
+  | "safari_ios";
+type FeatureStatus = "available";
+
+interface Feature {
+  baseline: {
+    low_date: string;
+    status: BaselineStatus;
+  };
+
+  browser_implementations: Record<BrowserKey, {
+    date: string;
+    status: FeatureStatus;
+    version: string;
+  }>;
+
+  feature_id: string;
+  name: string;
+  spec: {
+    links: any[];
+  };
+  usage: Record<BrowserKey, { daily: number }>;
+}
 
 /**
- * Extract the baseline data from the WebStatus API.
+ * Extract the baseline data from the WebStatus API. This retrieves the features going back by POLLING_INTERVAL_MS.
  *
  * This is shamelessly copied from:
  *
@@ -16,12 +45,11 @@ type BASELINE_STATUS_TYPES = "newly" | "widely";
  * @param baselineStatus indicates whether to get "newly" or "widely" available features
  * @returns the available features in the last 24 hours
  */
-async function getBaselineData(baselineStatus: BASELINE_STATUS_TYPES) {
+async function getBaselineData(baselineStatus: BaselineStatus) {
   // Default to "newly" available features if the status string is incorrect:
-  baselineStatus =
-    baselineStatus !== "newly" && baselineStatus !== "widely"
-      ? "newly"
-      : baselineStatus;
+  baselineStatus = baselineStatus !== "newly" && baselineStatus !== "widely"
+    ? "newly"
+    : baselineStatus;
 
   // Get the ending timestamp (now):
   const END_TIMESTAMP = new Date().getTime();
@@ -39,7 +67,7 @@ async function getBaselineData(baselineStatus: BASELINE_STATUS_TYPES) {
   const START_DATE_OBJ = new Date(START_TIMESTAMP);
   const START_MONTH = new String(START_DATE_OBJ.getMonth() + 1).padStart(
     2,
-    "0"
+    "0",
   );
   const START_DATE = new String(START_DATE_OBJ.getDate()).padStart(2, "0");
   const START_YEAR = new String(START_DATE_OBJ.getFullYear());
@@ -71,7 +99,7 @@ async function getBaselineData(baselineStatus: BASELINE_STATUS_TYPES) {
     [
       `baseline_date:${AVAILABLE_START}..${AVAILABLE_END}`,
       `baseline_status:${baselineStatus}`,
-    ].join(" AND ")
+    ].join(" AND "),
   );
 
   // Construct the fetch URL:
