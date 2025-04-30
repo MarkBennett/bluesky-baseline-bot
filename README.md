@@ -2,6 +2,8 @@
 
 # Bluesky Baseline Bot
 
+![Bluesky Baseline Bot](/docs/bluesky-baseline-bot.png)
+
 This project is a Deno-based bot that interacts with the WebStatus API to
 retrieve baseline data for web features. It polls the api every week and then
 posts the results to Bluesky for easy sharing!
