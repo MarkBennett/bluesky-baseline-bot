@@ -1,8 +1,10 @@
 import { retrieveAndPostNewlyAvailableFeatures } from "./main.ts";
 
+const CRON_SCHEDULE = Deno.env.get("CRON_SCHEDULE") || "0 0 * * *"; // Every day at midnight by default
+
 Deno.cron(
   "Query for new Web Platform features and post to Bluesky",
-  "0 0 * * *",
+  CRON_SCHEDULE,
   async () => {
     await retrieveAndPostNewlyAvailableFeatures();
   },
