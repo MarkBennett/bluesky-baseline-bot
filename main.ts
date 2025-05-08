@@ -223,7 +223,6 @@ export async function retrieveAndPostNewlyAvailableFeatures() {
     console.log("Newly available features!");
   } else {
     console.log("No newly available features!");
-    Deno.exit(0);
   }
 
   if (DEBUG) {
