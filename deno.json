@@ -1,6 +1,7 @@
 {
   "tasks": {
-    "dev": "deno run --watch main.ts"
+    "dev": "deno run --allow-net --allow-env --env-file=.env.development --watch main.ts",
+    "cron": "DEBUG=true deno run --allow-net --allow-read --allow-write --allow-env --env-file=.env.development --unstable-cron deploy_main.ts"
   },
   "imports": {
     "@std/assert": "jsr:@std/assert@1"
