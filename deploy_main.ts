@@ -7,9 +7,15 @@ Deno.cron(
   CRON_SCHEDULE,
   async () => {
     console.debug(
-      `Running scheduled task at ${new Date().toISOString()}. CRON_SCHEDULE: ${CRON_SCHEDULE}`,
+      `Running scheduled task at ${
+        new Date().toISOString()
+      }. CRON_SCHEDULE: ${CRON_SCHEDULE}`,
     );
-    await retrieveAndPostNewlyAvailableFeatures();
+    try {
+      await retrieveAndPostNewlyAvailableFeatures();
+    } catch (error) {
+      console.error("Error during scheduled task:", error);
+    }
     console.debug(
       `Finished scheduled task at ${new Date().toISOString()}.`,
     );
