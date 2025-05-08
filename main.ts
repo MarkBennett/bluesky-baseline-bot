@@ -217,6 +217,8 @@ async function getBlueskyAgent(): Promise<AtpAgent> {
 }
 
 export async function retrieveAndPostNewlyAvailableFeatures() {
+  console.debug("Retrieving newly available features...");
+
   const { data: features } = await getBaselineData();
 
   if (features.length > 0) {
@@ -230,6 +232,7 @@ export async function retrieveAndPostNewlyAvailableFeatures() {
   } else {
     await publishNewlyAvailableFeaturesToBluesky(features);
   }
+  console.debug("Finished posting newly available features!");
 }
 
 // Learn more at https://docs.deno.com/runtime/manual/examples/module_metadata#concepts

@@ -6,7 +6,13 @@ Deno.cron(
   "Query for new Web Platform features and post to Bluesky",
   CRON_SCHEDULE,
   async () => {
+    console.debug(
+      `Running scheduled task at ${new Date().toISOString()}. CRON_SCHEDULE: ${CRON_SCHEDULE}`,
+    );
     await retrieveAndPostNewlyAvailableFeatures();
+    console.debug(
+      `Finished scheduled task at ${new Date().toISOString()}.`,
+    );
   },
 );
 
