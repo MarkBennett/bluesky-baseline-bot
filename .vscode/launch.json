@@ -15,6 +15,7 @@
             "runtimeArgs": [
                 "run",
                 "--unstable",
+                "--unstable-kv",
                 "--inspect-wait",
                 "--allow-env",
                 "--env-file=.env.development",
