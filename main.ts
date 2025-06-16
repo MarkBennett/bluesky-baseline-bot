@@ -15,33 +15,51 @@ type BrowserKey =
   | "firefox_android"
   | "safari"
   | "safari_ios";
-type FeatureStage = "newly" | "widely";
-interface Feature {
+type BrowserVersion = string;
+type FeatureStatus = {
+  baseline: "high";
+  baseline_high_date: string;
+  baseline_low_date: string;
+  support: Record<BrowserKey, BrowserVersion>;
+} | {
+  baseline: "low";
+  baseline_low_date: string;
+  support: Record<BrowserKey, BrowserVersion>;
+} | {
+  baseline: false;
+  support: Record<BrowserKey, BrowserVersion>;
+  }
 
+interface Feature {
+  compat_features: string[];
+  description: string;
+  description_html: string;
+  group: string;
+  name: string;
+  spec: string;
+  status: FeatureStatus;
+  discouraged?: {
+    according_to: string[];
+    alternatives?: string[];
+  }
 }
 
-interface FeatureResponse {
-  data: Feature[];
-  meta: {
-    next_page_token: string;
-    total: number;
-  };
+interface FeatureWithId extends Feature {
+  feature_id: string;
 }
 
 const kv = await Deno.openKv();
 
-async function publishNewlyAvailableFeaturesToBluesky(features: Feature[]) {
+async function publishNewlyAvailableFeaturesToBluesky(features: FeatureWithId[]) {
   for (const feature of features) {
     await publishFeatureToBluesky(feature);
   }
 }
 
-async function publishFeatureToBluesky(feature: Feature) {
-  const { name, feature_id } = feature;
+async function publishFeatureToBluesky(feature: FeatureWithId) {
+  const { name, description, feature_id } = feature;
 
   const webStatusUrl = `https://webstatus.dev/features/${feature_id}`;
-
-  const description = await fetchFeatureDescription(feature_id);
 
   // Construct the message to be sent to Bluesky:
   const message = `Newly available feature: ${name}\n\n` +
@@ -88,7 +106,12 @@ async function getBlueskyAgent(): Promise<AtpAgent> {
 
 const WEB_PLATFORM_REPO = "web-platform-dx/web-features";
 
-async function getLatestWebPlatformReleaseData() {
+
+interface WebPlatformData {
+  features: Record<string, Feature>;
+}
+
+async function getLatestWebPlatformReleaseData(): Promise<WebPlatformData> {
   // Use the GitHub API to get the latest release data
   const response = await fetch(
     `https://api.github.com/repos/${WEB_PLATFORM_REPO}/releases/latest`,
@@ -105,7 +128,7 @@ async function getLatestWebPlatformReleaseData() {
   const releaseData = await response.json();
 
   // Check the release assets for the url of the "data.json" file
-  const dataAsset = releaseData.assets.find((asset: any) => asset.name === "data.json");
+  const dataAsset = releaseData.assets.find((asset: { name?: string }) => asset.name === "data.json");
   if (!dataAsset) {
     throw new Error("No data.json asset found in the latest release");
   }
@@ -146,21 +169,22 @@ async function setFeatureHashInDB(featureId: string, hash: string): Promise<void
   await kv.set(["features", featureId], hash);
 }
 
-async function extractNewFeaturesFromData(): Promise<Feature[]> {
+async function extractNewFeaturesFromData(): Promise<FeatureWithId[]> {
   // Retrieve the newest web-features data
   const latestData = await getLatestWebPlatformReleaseData();
 
   // For each item in the data, compare a hash of the item to one stored in the Deno.KV store
   // If the hash is not found, publish the feature to Bluesky and store the hash in Deno.KV
   const featureItems = latestData.features;
-  const newFeatureItems: Feature[] = [];
+  const newFeatureItems: FeatureWithId[] = [];
   for (const featureKey of Object.keys(featureItems)) {
     const item = featureItems[featureKey];
     const featureHash = await hashFeature(item);
 
     const existingHash = await getFeatureHashFromDB(featureKey);
     if (existingHash === null || existingHash !== featureHash) {
-      newFeatureItems.push(item);
+      const itemWithId: FeatureWithId = { ...item, feature_id: featureKey };
+      newFeatureItems.push(itemWithId);
       await setFeatureHashInDB(featureKey, featureHash);
     }
   }
@@ -171,4 +195,7 @@ async function extractNewFeaturesFromData(): Promise<Feature[]> {
 // Learn more at https://docs.deno.com/runtime/manual/examples/module_metadata#concepts
 if (import.meta.main) {
   const newFeatures = await extractNewFeaturesFromData();
+
+  await publishNewlyAvailableFeaturesToBluesky(newFeatures);
+  console.log(`Published ${newFeatures.length} newly available features to Bluesky.`);
 }
