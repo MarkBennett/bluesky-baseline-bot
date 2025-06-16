@@ -1,20 +1,10 @@
 import { AtpAgent, RichText } from "npm:@atproto/api";
 import { type Record as AptRecord } from "npm:@atproto/api/dist/client/types/app/bsky/feed/post.js";
+import Parser from "npm:rss-parser";
 
-const DEBUG = Deno.env.get("DEBUG") === "true" ? true : false;
 const BLUESKY_HOST = Deno.env.get("BLUESKY_HOST") || "https://bsky.social";
 const BLUESKY_USERNAME = Deno.env.get("BLUESKY_USERNAME");
 const BLUESKY_PASSWORD = Deno.env.get("BLUESKY_PASSWORD");
-
-const PREAMBLE_LIMITED = "🟠 Limited Availability";
-const PREAMBLE_NEWLY = "🔵 Newly Available";
-const PREAMBLE_WIDELY = "🟢 Widely Available";
-
-/**
- * The time offset in milliseconds for the baseline start time. This script runs once a day, so we want to get the
- * features that have become available in the last 24 hours.
- */
-const BASELINE_START_TIME_OFFSET = 60 * 60 * 24; // 24 hours in seconds
 
 type BaselineStatus = "newly" | "widely";
 type BrowserKey =
@@ -28,25 +18,7 @@ type BrowserKey =
 type FeatureStatus = "available";
 
 interface Feature {
-  baseline: {
-    low_date: string;
-    status: BaselineStatus;
-  };
 
-  browser_implementations: Record<BrowserKey, {
-    date: string;
-    status: FeatureStatus;
-    version: string;
-  }>;
-
-  feature_id: string;
-  name: string;
-  spec: {
-    links: {
-      link: string;
-    }[];
-  };
-  usage: Record<BrowserKey, { daily: number }>;
 }
 
 interface FeatureResponse {
@@ -57,73 +29,8 @@ interface FeatureResponse {
   };
 }
 
-/**
- * Extract the baseline data from the WebStatus API.
- *
- * By default, this retrieves features available in the last day. In debug mode, it retrieves going back to
- * "2020-01-01".
- *
- * This is shamelessly copied from:
- *
- * https://github.com/GoogleChromeLabs/baseline-demos/blob/main/tooling/email-digest/index.js
- *
- * See the Web Platform Baseline page to understand the difference between the baseline statuses:
- *
- * https://web-platform-dx.github.io/web-features/#how-do-features-become-part-of-baseline%3F
- *
- * @returns the available features in the last 24 hours
- */
-async function getBaselineData(): Promise<FeatureResponse> {
-  // Get the ending timestamp (now):
-  const endTimestamp = new Date().getTime();
+const kv = await Deno.openKv();
 
-  // Build the start date:
-  let availableStart;
-
-  // If we're in debug mode, we want to ensure we get output, so set a date
-  // in the far past to make sure something gets sent. This is because
-  // sometimes there's no Newly available features in the last week
-  if (DEBUG) {
-    availableStart = "2020-01-01";
-  } else {
-    const startTimestamp = endTimestamp - BASELINE_START_TIME_OFFSET;
-    const startDateObj = new Date(startTimestamp);
-    const startMonth = new String(startDateObj.getMonth() + 1).padStart(
-      2,
-      "0",
-    );
-    const startDate = new String(startDateObj.getDate()).padStart(2, "0");
-    const startYear = new String(startDateObj.getFullYear());
-    availableStart = `${startYear}-${startMonth}-${startDate}`;
-  }
-
-  // Build the end date:
-  let availableEnd;
-
-  if (DEBUG) {
-    availableEnd = "2025-01-01";
-  } else {
-    const endDateObj = new Date(endTimestamp);
-    const endMonth = new String(endDateObj.getMonth() + 1).padStart(2, "0");
-    const endDate = new String(endDateObj.getDate()).padStart(2, "0");
-    const endYear = new String(endDateObj.getFullYear());
-
-    availableEnd = `${endYear}-${endMonth}-${endDate}`;
-  }
-
-  const queryParams = encodeURI(
-    `baseline_date:${availableStart}..${availableEnd} AND (baseline_status:widely OR baseline_status:newly)`,
-  );
-
-  // Construct the fetch URL:
-  const fetchUrl = `https://api.webstatus.dev/v1/features?q=${queryParams}`;
-
-  // Fetch the data and get its JSON representation:
-  const response = await fetch(fetchUrl);
-  const jsonData = await response.json();
-
-  return jsonData;
-}
 async function publishNewlyAvailableFeaturesToBluesky(features: Feature[]) {
   for (const feature of features) {
     await publishFeatureToBluesky(feature);
@@ -137,47 +44,19 @@ async function publishFeatureToBluesky(feature: Feature) {
 
   const description = await fetchFeatureDescription(feature_id);
 
-  // Construct the message to be sent to Bluesky
-  const messagePreamble = feature.baseline.status === "newly"
-    ? PREAMBLE_NEWLY
-    : feature.baseline.status === "widely"
-    ? PREAMBLE_WIDELY
-    : PREAMBLE_LIMITED;
-  const message = `${messagePreamble}: ${name}\n\n` +
-    `Description: ${description}\n\n`;
-
-  const embedTitle = `Web Platform Status: ${name}`;
-  const embedDescription = `${messagePreamble}: ${description}`;
+  // Construct the message to be sent to Bluesky:
+  const message = `Newly available feature: ${name}\n\n` +
+    `Description: ${description}\n\n` +
+    `Learn More: ${webStatusUrl}`;
 
   // Get the Bluesky agent
   const agent = await getBlueskyAgent();
 
   // Send the message to Bluesky:
-  await sendMessageToBluesky(
-    agent,
-    message,
-    embedTitle,
-    embedDescription,
-    webStatusUrl,
-  );
+  await sendMessageToBluesky(agent, message);
 }
 
-async function fetchFeatureDescription(feature_id: string) {
-  const descriptionRequest = await fetch(
-    `https://api.webstatus.dev/v1/features/${feature_id}/feature-metadata`,
-  );
-  const { description } = await descriptionRequest.json();
-
-  return description;
-}
-
-async function sendMessageToBluesky(
-  agent: AtpAgent,
-  message: string,
-  embedItitle: string,
-  embedDescription: string,
-  embedUrl: string,
-) {
+async function sendMessageToBluesky(agent: AtpAgent, message: string) {
   const rt = new RichText({ text: message });
   await rt.detectFacets(agent);
   const postRecord: AptRecord = {
@@ -185,16 +64,8 @@ async function sendMessageToBluesky(
     text: rt.text,
     facets: rt.facets,
     createdAt: new Date().toISOString(),
-    embed: {
-      $type: "app.bsky.embed.external",
-      external: {
-        uri: embedUrl,
-        title: embedItitle,
-        description: embedDescription,
-      },
-    },
   };
-  await agent.post(postRecord);
+  const record = await agent.post(postRecord);
 }
 
 async function getBlueskyAgent(): Promise<AtpAgent> {
@@ -216,26 +87,63 @@ async function getBlueskyAgent(): Promise<AtpAgent> {
   return agent;
 }
 
-export async function retrieveAndPostNewlyAvailableFeatures() {
-  console.debug("Retrieving newly available features...");
+const NEWLY_AVAILABLE_FEATURES_URL = "https://web-platform-dx.github.io/web-features-explorer/newly-available.xml";
+const NEW_WIDELY_AVAILABLE_FEATURES_URL = "https://web-platform-dx.github.io/web-features-explorer/widely-available.xml";
 
-  const { data: features } = await getBaselineData();
+async function hashFeature(feature: any): string {
+  const featureString = JSON.stringify(feature);
+  const featureStringUtf8 = new TextEncoder().encode(featureString);
 
-  if (features.length > 0) {
-    console.log("Newly available features!");
-  } else {
-    console.log("No newly available features!");
-  }
+  const hashBuffer = await crypto.subtle.digest("SHA-256", featureStringUtf8);
+  const hashArray = Array.from(new Uint8Array(hashBuffer));
+  const hashHex = hashArray.map((b) => b.toString(16).padStart(2, "0")).join("");
 
-  if (DEBUG) {
-    await publishFeatureToBluesky(features[0]);
-  } else {
-    await publishNewlyAvailableFeaturesToBluesky(features);
-  }
-  console.debug("Finished posting newly available features!");
+  return hashHex;
 }
+
+async function getFeatureHashFromDB(featureId: string): Promise<string | null> {
+  const existingHash = await kv.get<string>(["features", featureId]);
+  if (existingHash) {
+    return existingHash.value;
+  }
+  return null;
+}
+
+async function setFeatureHashInDB(featureId: string, hash: string): Promise<void> {
+  await kv.set(["features", featureId], hash);
+}
+
+async function getNewFeaturesFromRSS() {
+  // Retrieve the RSS feed for newly available features
+  const parser = new Parser();
+  const newlyAvailableFeaturesFeed = await parser.parseURL(NEWLY_AVAILABLE_FEATURES_URL);
+
+  // For each item in the feed, compare a hash of the item to one stored in the Deno.KV store
+  // If the hash is not found, publish the feature to Bluesky and store the hash in Deno.KV
+  const newlyAvailableFeatures = newlyAvailableFeaturesFeed.items || [];
+  const newNewlyAvailableFeatures: Feature[] = [];
+  for (const item of newlyAvailableFeatures) {
+    const featureId = item.title;
+
+    if (!featureId) {
+      console.warn("Feature ID is missing in item:", item);
+      continue;
+    }
+
+    const featureHash = await hashFeature(item);
+
+    const existingHash = await getFeatureHashFromDB(featureId);
+    if (existingHash === null || existingHash !== featureHash) {
+      newNewlyAvailableFeatures.push(item);
+      await setFeatureHashInDB(featureId, featureHash);
+    }
+  }
+
+  return { newNewlyAvailableFeatures };
+}
+
 
 // Learn more at https://docs.deno.com/runtime/manual/examples/module_metadata#concepts
 if (import.meta.main) {
-  await retrieveAndPostNewlyAvailableFeatures();
+  const { newNewlyAvailableFeatures, newWidelyAvailableFeatures } = await getNewFeaturesFromRSS();
 }
