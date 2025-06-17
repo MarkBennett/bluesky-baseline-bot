@@ -192,10 +192,16 @@ async function extractNewFeaturesFromData(): Promise<FeatureWithId[]> {
   return newFeatureItems;
 }
 
-// Learn more at https://docs.deno.com/runtime/manual/examples/module_metadata#concepts
-if (import.meta.main) {
+async function retrieveAndPostNewlyAvailableFeatures() {
   const newFeatures = await extractNewFeaturesFromData();
 
   await publishNewlyAvailableFeaturesToBluesky(newFeatures);
   console.log(`Published ${newFeatures.length} newly available features to Bluesky.`);
 }
+
+// Learn more at https://docs.deno.com/runtime/manual/examples/module_metadata#concepts
+if (import.meta.main) {
+  await retrieveAndPostNewlyAvailableFeatures();
+}
+
+export { retrieveAndPostNewlyAvailableFeatures }
