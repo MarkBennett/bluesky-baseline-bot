@@ -6,7 +6,12 @@ const BLUESKY_HOST = Deno.env.get("BLUESKY_HOST") || "https://bsky.social";
 const BLUESKY_USERNAME = Deno.env.get("BLUESKY_USERNAME");
 const BLUESKY_PASSWORD = Deno.env.get("BLUESKY_PASSWORD");
 
-type BaselineStatus = "newly" | "widely";
+/**
+ * For more information about the baseline status stages, see:
+ *
+ * https://web-platform-dx.github.io/web-features/
+ */
+type BaselineStatus = "newly" | "widely" | "limited";
 type BrowserKey =
   | "chrome"
   | "chrome_android"
@@ -46,6 +51,7 @@ interface Feature {
 
 interface FeatureWithId extends Feature {
   feature_id: string;
+  baseline_stage: BaselineStatus;
 }
 
 const kv = await Deno.openKv();
@@ -169,6 +175,16 @@ async function setFeatureHashInDB(featureId: string, hash: string): Promise<void
   await kv.set(["features", featureId], hash);
 }
 
+function featureBaselinStage(feature: Feature): BaselineStatus {
+  if (feature.status.baseline === "high") {
+    return "widely";
+  } else if (feature.status.baseline === "low") {
+    return "newly";
+  } else {
+    return "limited"; // Default to newly if baseline is false
+  }
+}
+
 async function extractNewFeaturesFromData(): Promise<FeatureWithId[]> {
   // Retrieve the newest web-features data
   const latestData = await getLatestWebPlatformReleaseData();
@@ -183,7 +199,7 @@ async function extractNewFeaturesFromData(): Promise<FeatureWithId[]> {
 
     const existingHash = await getFeatureHashFromDB(featureKey);
     if (existingHash === null || existingHash !== featureHash) {
-      const itemWithId: FeatureWithId = { ...item, feature_id: featureKey };
+      const itemWithId: FeatureWithId = { ...item, feature_id: featureKey, baseline_stage: featureBaselinStage(item) };
       newFeatureItems.push(itemWithId);
       await setFeatureHashInDB(featureKey, featureHash);
     }
