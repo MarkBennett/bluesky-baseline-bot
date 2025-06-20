@@ -1,6 +1,5 @@
 import { AtpAgent, RichText } from "npm:@atproto/api";
 import { type Record as AptRecord } from "npm:@atproto/api/dist/client/types/app/bsky/feed/post.js";
-import Parser from "npm:rss-parser";
 
 const BLUESKY_HOST = Deno.env.get("BLUESKY_HOST") || "https://bsky.social";
 const BLUESKY_USERNAME = Deno.env.get("BLUESKY_USERNAME");
