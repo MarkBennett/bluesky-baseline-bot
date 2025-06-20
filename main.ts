@@ -59,7 +59,7 @@ async function publishNewlyAvailableFeaturesToBluesky(features: FeatureWithId[])
 async function publishFeatureToBluesky(feature: FeatureWithId) {
   const { name, description, feature_id } = feature;
 
-  const webStatusUrl = `https://web-platform-dx.github.io/web-features-explorer/${feature_id}`;
+  const webStatusUrl = `https://web-platform-dx.github.io/web-features-explorer/features/${feature_id}`;
 
   // Construct the message to be sent to Bluesky:
   const message = `Newly available feature: ${name}\n\n` +
@@ -262,6 +262,28 @@ async function prepareDatabase() {
   }
 }
 
+/**
+ * Used for testing purposes to clear a random feature from the database so that it will publish again to Bluesky.
+ */
+async function clearRandomFeatureFromDB(count: number = 1) {
+  const entries = kv.list({ prefix: [`features`] });
+  const keys = [];
+  for await (const entry of entries) {
+    keys.push(entry.key);
+  }
+
+  let deletedCount = 0;
+  const keysToDelete = keys.sort(() => Math.random() - 0.5).slice(0, count);
+
+  for (const key of keysToDelete) {
+    await kv.delete(key);
+    deletedCount++;
+    console.log(`Deleted feature hash: ${key.join("/")}`);
+  }
+
+  console.log(`Deleted ${deletedCount} feature hashes from the database.`);
+}
+
 async function entrypoint() {
   await prepareDatabase();
 
@@ -276,6 +298,12 @@ if (import.meta.main) {
     console.log("Clearing the database...");
     await clearDatabase();
     console.log("Database cleared.");
+    Deno.exit(0);
+  };
+  if(args.includes("--clear-random-feature")) {
+    const countIndex = args.indexOf("--clear-random-feature");
+    const count = countIndex !== -1 && args[countIndex + 1] ? parseInt(args[countIndex + 1]) : 1;
+    await clearRandomFeatureFromDB(count);
     Deno.exit(0);
   };
 
