@@ -67,7 +67,21 @@ async function publishFeatureToBluesky(feature: FeatureWithId) {
   const webStatusUrl = `https://web-platform-dx.github.io/web-features-explorer/features/${feature_id}`;
 
   // Construct the message to be sent to Bluesky:
-  const message = `Newly available feature: ${name}\n\n` +
+  let preamble = "";
+  switch (feature.baseline_stage) {
+    case "widely":
+      preamble =  `Widely available feature (+30 months in browsers)`;
+      break;
+    case "newly":
+      preamble =  `Newly available feature (in latest browsers)`;
+      break;
+    case "limited":
+      preamble =  `Limited availability feature (in some browsers)`;
+      break;
+    default:
+    preamble = `Feature`;
+  };
+  const message = `${preamble}: ${name}\n\n` +
     `Description: ${description}\n\n` +
     `Learn More: ${webStatusUrl}`;
 
