@@ -59,7 +59,7 @@ async function publishNewlyAvailableFeaturesToBluesky(features: FeatureWithId[])
 async function publishFeatureToBluesky(feature: FeatureWithId) {
   const { name, description, feature_id } = feature;
 
-  const webStatusUrl = `https://webstatus.dev/features/${feature_id}`;
+  const webStatusUrl = `https://web-platform-dx.github.io/web-features-explorer/${feature_id}`;
 
   // Construct the message to be sent to Bluesky:
   const message = `Newly available feature: ${name}\n\n` +
@@ -82,7 +82,7 @@ async function sendMessageToBluesky(agent: AtpAgent, message: string) {
     facets: rt.facets,
     createdAt: new Date().toISOString(),
   };
-  const record = await agent.post(postRecord);
+  await agent.post(postRecord);
 }
 
 async function getBlueskyAgent(): Promise<AtpAgent> {
@@ -199,9 +199,87 @@ async function retrieveAndPostNewlyAvailableFeatures() {
   console.log(`Published ${newFeatures.length} newly available features to Bluesky.`);
 }
 
-// Learn more at https://docs.deno.com/runtime/manual/examples/module_metadata#concepts
-if (import.meta.main) {
+async function getDatabaseVersion() {
+  const version = await kv.get<number>(["db_version"]);
+  if (version && version.value !== null && typeof version.value === "number") {
+    return version.value;
+  }
+  return undefined; // Explicitly return undefined if no version is found
+}
+
+async function setDatabaseVersion(version: number) {
+  await kv.set(["db_version"], version);
+}
+
+const MIGRATIONS = [ async () => {
+  // Populate the database with initial hashes of features
+  const latestData = await getLatestWebPlatformReleaseData();
+  const features = latestData.features;
+
+  console.log(`Populating ${Object.keys(features).length} initial feature hashes in the database...`);
+  for (const featureKey of Object.keys(features)) {
+    const item = features[featureKey];
+    const featureHash = await hashFeature(item);
+    await setFeatureHashInDB(featureKey, featureHash);
+  }
+
+  console.log("Initial feature hashes populated in the database.");
+}];
+
+async function runMigrationsStartingFrom(startVersion: number) {
+  for (let i = startVersion; i < MIGRATIONS.length; i++) {
+    console.log(`Running migration ${i + 1}/${MIGRATIONS.length}...`);
+    await MIGRATIONS[i]();
+    console.log(`Migration ${i + 1} completed.`);
+  }
+  setDatabaseVersion(MIGRATIONS.length);
+}
+
+/**
+ * Delete all keys in the database, including the database version key.
+ * This is useful for resetting the database to a clean state.
+ */
+async function clearDatabase() {
+  // Retrieve all entries in the database, then delete them
+  const entries = kv.list({ prefix: [`features`] });
+  for await (const entry of entries) {
+    await kv.delete(entry.key);
+  }
+
+  // Also delete the database version key
+  await kv.delete(["db_version"]);
+}
+
+async function prepareDatabase() {
+  const currentVersion = await getDatabaseVersion();
+
+  if (currentVersion === undefined) {
+    await runMigrationsStartingFrom(0);
+  } else {
+    if (currentVersion < MIGRATIONS.length) {
+      await runMigrationsStartingFrom(currentVersion);
+    }
+  }
+}
+
+async function entrypoint() {
+  await prepareDatabase();
+
   await retrieveAndPostNewlyAvailableFeatures();
 }
 
-export { retrieveAndPostNewlyAvailableFeatures }
+// Learn more at https://docs.deno.com/runtime/manual/examples/module_metadata#concepts
+if (import.meta.main) {
+  // Retrieve the arguments passed to the script and if --clear-db is present, clear the database
+  const args = Deno.args;
+  if (args.includes("--clear-db")) {
+    console.log("Clearing the database...");
+    await clearDatabase();
+    console.log("Database cleared.");
+    Deno.exit(0);
+  };
+
+  await entrypoint();
+}
+
+export { entrypoint }

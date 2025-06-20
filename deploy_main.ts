@@ -1,4 +1,4 @@
-import { retrieveAndPostNewlyAvailableFeatures } from "./main.ts";
+import { entrypoint } from "./main.ts";
 
 const CRON_SCHEDULE = Deno.env.get("CRON_SCHEDULE") || "0 0 * * *"; // Every day at midnight by default
 
@@ -12,7 +12,7 @@ Deno.cron(
       }. CRON_SCHEDULE: ${CRON_SCHEDULE}`,
     );
     try {
-      await retrieveAndPostNewlyAvailableFeatures();
+      await entrypoint();
     } catch (error) {
       console.error("Error during scheduled task:", error);
     }
