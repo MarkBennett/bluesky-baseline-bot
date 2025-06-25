@@ -70,20 +70,24 @@ async function publishFeatureToBluesky(feature: FeatureWithId) {
   let preamble = "";
   switch (feature.baseline_stage) {
     case "widely":
-      preamble =  `Widely available feature (+30 months in browsers)`;
+      preamble =  `Widely available`;
       break;
     case "newly":
-      preamble =  `Newly available feature (in latest browsers)`;
+      preamble =  `Newly available`;
       break;
     case "limited":
-      preamble =  `Limited availability feature (in some browsers)`;
+      preamble =  `Limited`;
       break;
     default:
     preamble = `Feature`;
   };
+  const MAX_DESCRIPTION_LENGTH = 200;
+  const ELIPSIS = "…";
+  const sanitizedDescription = description.length + ELIPSIS.length > MAX_DESCRIPTION_LENGTH ? description.slice(0, MAX_DESCRIPTION_LENGTH - ELIPSIS.length) + "..." : description; // Limit description to 200 characters
+  const sanitizedName = name.slice(0, 80); // Limit name to 50 characters
   const message = `${preamble}: ${name}\n\n` +
-    `Description: ${description}\n\n` +
-    `Learn More: ${webStatusUrl}`;
+    `Description: ${sanitizedDescription}\n\n` +
+    `Learn More: ${sanitizedName}`;
 
   // Get the Bluesky agent
   const agent = await getBlueskyAgent();
