@@ -1,6 +1,8 @@
 import { AtpAgent, RichText } from "npm:@atproto/api";
 import { type Record as AptRecord } from "npm:@atproto/api/dist/client/types/app/bsky/feed/post.js";
 
+type AptEmbed = AptRecord["embed"];
+
 const BLUESKY_HOST = Deno.env.get("BLUESKY_HOST") || "https://bsky.social";
 const BLUESKY_USERNAME = Deno.env.get("BLUESKY_USERNAME");
 const BLUESKY_PASSWORD = Deno.env.get("BLUESKY_PASSWORD");
@@ -32,7 +34,7 @@ type FeatureStatus = {
 } | {
   baseline: false;
   support: Record<BrowserKey, BrowserVersion>;
-  }
+};
 
 interface Feature {
   compat_features: string[];
@@ -45,7 +47,7 @@ interface Feature {
   discouraged?: {
     according_to: string[];
     alternatives?: string[];
-  }
+  };
 }
 
 interface FeatureWithId extends Feature {
@@ -55,7 +57,9 @@ interface FeatureWithId extends Feature {
 
 const kv = await Deno.openKv();
 
-async function publishNewlyAvailableFeaturesToBluesky(features: FeatureWithId[]) {
+async function publishNewlyAvailableFeaturesToBluesky(
+  features: FeatureWithId[],
+) {
   for (const feature of features) {
     await publishFeatureToBluesky(feature);
   }
@@ -64,45 +68,90 @@ async function publishNewlyAvailableFeaturesToBluesky(features: FeatureWithId[])
 async function publishFeatureToBluesky(feature: FeatureWithId) {
   const { name, description, feature_id } = feature;
 
-  const webStatusUrl = `https://web-platform-dx.github.io/web-features-explorer/features/${feature_id}`;
+  const webStatusUrl =
+    `https://web-platform-dx.github.io/web-features-explorer/features/${feature_id}`;
 
   // Construct the message to be sent to Bluesky:
   let preamble = "";
   switch (feature.baseline_stage) {
     case "widely":
-      preamble =  `Widely available`;
+      preamble = `Widely available`;
       break;
     case "newly":
-      preamble =  `Newly available`;
+      preamble = `Newly available`;
       break;
     case "limited":
-      preamble =  `Limited`;
+      preamble = `Limited`;
       break;
     default:
-    preamble = `Feature`;
-  };
+      preamble = `Feature`;
+  }
   const MAX_DESCRIPTION_LENGTH = 200;
   const ELIPSIS = "…";
-  const sanitizedDescription = description.length + ELIPSIS.length > MAX_DESCRIPTION_LENGTH ? description.slice(0, MAX_DESCRIPTION_LENGTH - ELIPSIS.length) + "..." : description; // Limit description to 200 characters
+  const sanitizedDescription =
+    description.length + ELIPSIS.length > MAX_DESCRIPTION_LENGTH
+      ? description.slice(0, MAX_DESCRIPTION_LENGTH - ELIPSIS.length) + "..."
+      : description; // Limit description to 200 characters
   const sanitizedName = name.slice(0, 80); // Limit name to 50 characters
-  const message = `${preamble}: ${name}\n\n` +
-    `Description: ${sanitizedDescription}\n\n` +
-    `Learn More: ${sanitizedName}`;
+  const message = `${preamble}: ${sanitizedName}\n\n` +
+    `Description: ${sanitizedDescription}\n\n`;
+
+  // Get the Web Platform Features Explorer logo to use as a thumbnail
+  const WEBPLATFORM_LOGO_URL =
+    "https://web-platform-dx.github.io/web-features-explorer/assets/logo.png";
+  const thumbnailData = await fetch(WEBPLATFORM_LOGO_URL);
+  const thumbnailBlob = await thumbnailData.blob();
 
   // Get the Bluesky agent
   const agent = await getBlueskyAgent();
 
   // Send the message to Bluesky:
-  await sendMessageToBluesky(agent, message);
+  await sendMessageToBluesky(
+    agent,
+    message,
+    webStatusUrl,
+    thumbnailBlob,
+    `${sanitizedName} on Webplatform Feature Explorer`,
+    sanitizedDescription,
+  );
 }
 
-async function sendMessageToBluesky(agent: AtpAgent, message: string) {
+async function sendMessageToBluesky(
+  agent: AtpAgent,
+  message: string,
+  embedUrl: string,
+  embedThumbnailData: Blob,
+  embedTitle: string,
+  embedDescription: string,
+) {
+  // Upload and create the blob ref for the thumbnail
+  const thumbnailUploadResponse = await agent.uploadBlob(embedThumbnailData, {
+    encoding: "image/png",
+  });
+  if (!thumbnailUploadResponse.success) {
+    throw new Error(
+      `Failed to upload thumbnail to Bluesky: ${thumbnailUploadResponse}`,
+    );
+  }
+  const thumbnailBlobRef = thumbnailUploadResponse.data.blob;
+
+  const embed: AptEmbed = {
+    $type: "app.bsky.embed.external",
+    external: {
+      uri: embedUrl,
+      title: embedTitle,
+      description: embedDescription,
+      thumb: thumbnailBlobRef,
+    },
+  };
+
   const rt = new RichText({ text: message });
   await rt.detectFacets(agent);
   const postRecord: AptRecord = {
     $type: "app.bsky.feed.post",
     text: rt.text,
     facets: rt.facets,
+    embed,
     createdAt: new Date().toISOString(),
   };
   await agent.post(postRecord);
@@ -129,7 +178,6 @@ async function getBlueskyAgent(): Promise<AtpAgent> {
 
 const WEB_PLATFORM_REPO = "web-platform-dx/web-features";
 
-
 interface WebPlatformData {
   features: Record<string, Feature>;
 }
@@ -146,12 +194,16 @@ async function getLatestWebPlatformReleaseData(): Promise<WebPlatformData> {
     },
   );
   if (!response.ok) {
-    throw new Error(`Failed to fetch latest release data: ${response.statusText}`);
+    throw new Error(
+      `Failed to fetch latest release data: ${response.statusText}`,
+    );
   }
   const releaseData = await response.json();
 
   // Check the release assets for the url of the "data.json" file
-  const dataAsset = releaseData.assets.find((asset: { name?: string }) => asset.name === "data.json");
+  const dataAsset = releaseData.assets.find((asset: { name?: string }) =>
+    asset.name === "data.json"
+  );
   if (!dataAsset) {
     throw new Error("No data.json asset found in the latest release");
   }
@@ -175,7 +227,9 @@ async function hashFeature(feature: any): Promise<string> {
 
   const hashBuffer = await crypto.subtle.digest("SHA-256", featureStringUtf8);
   const hashArray = Array.from(new Uint8Array(hashBuffer));
-  const hashHex = hashArray.map((b) => b.toString(16).padStart(2, "0")).join("");
+  const hashHex = hashArray.map((b) => b.toString(16).padStart(2, "0")).join(
+    "",
+  );
 
   return hashHex;
 }
@@ -188,7 +242,10 @@ async function getFeatureHashFromDB(featureId: string): Promise<string | null> {
   return null;
 }
 
-async function setFeatureHashInDB(featureId: string, hash: string): Promise<void> {
+async function setFeatureHashInDB(
+  featureId: string,
+  hash: string,
+): Promise<void> {
   await kv.set(["features", featureId], hash);
 }
 
@@ -216,7 +273,11 @@ async function extractNewFeaturesFromData(): Promise<FeatureWithId[]> {
 
     const existingHash = await getFeatureHashFromDB(featureKey);
     if (existingHash === null || existingHash !== featureHash) {
-      const itemWithId: FeatureWithId = { ...item, feature_id: featureKey, baseline_stage: featureBaselinStage(item) };
+      const itemWithId: FeatureWithId = {
+        ...item,
+        feature_id: featureKey,
+        baseline_stage: featureBaselinStage(item),
+      };
       newFeatureItems.push(itemWithId);
       await setFeatureHashInDB(featureKey, featureHash);
     }
@@ -229,7 +290,9 @@ async function retrieveAndPostNewlyAvailableFeatures() {
   const newFeatures = await extractNewFeaturesFromData();
 
   await publishNewlyAvailableFeaturesToBluesky(newFeatures);
-  console.log(`Published ${newFeatures.length} newly available features to Bluesky.`);
+  console.log(
+    `Published ${newFeatures.length} newly available features to Bluesky.`,
+  );
 }
 
 async function getDatabaseVersion() {
@@ -244,12 +307,16 @@ async function setDatabaseVersion(version: number) {
   await kv.set(["db_version"], version);
 }
 
-const MIGRATIONS = [ async () => {
+const MIGRATIONS = [async () => {
   // Populate the database with initial hashes of features
   const latestData = await getLatestWebPlatformReleaseData();
   const features = latestData.features;
 
-  console.log(`Populating ${Object.keys(features).length} initial feature hashes in the database...`);
+  console.log(
+    `Populating ${
+      Object.keys(features).length
+    } initial feature hashes in the database...`,
+  );
   for (const featureKey of Object.keys(features)) {
     const item = features[featureKey];
     const featureHash = await hashFeature(item);
@@ -332,15 +399,17 @@ if (import.meta.main) {
     await clearDatabase();
     console.log("Database cleared.");
     Deno.exit(0);
-  };
-  if(args.includes("--clear-random-feature")) {
+  }
+  if (args.includes("--clear-random-feature")) {
     const countIndex = args.indexOf("--clear-random-feature");
-    const count = countIndex !== -1 && args[countIndex + 1] ? parseInt(args[countIndex + 1]) : 1;
+    const count = countIndex !== -1 && args[countIndex + 1]
+      ? parseInt(args[countIndex + 1])
+      : 1;
     await clearRandomFeatureFromDB(count);
     Deno.exit(0);
-  };
+  }
 
   await entrypoint();
 }
 
-export { entrypoint }
+export { entrypoint };
